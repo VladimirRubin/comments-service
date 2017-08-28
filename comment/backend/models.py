@@ -7,12 +7,14 @@ from django.utils.timezone import now
 from django.utils.translation import ugettext_lazy as _
 from simple_history.models import HistoricalRecords
 
-from backend.constants import COMMENT_UPDATED_REASON, COMMENT_CREATED_REASON, COMMENT_DELETED_REASON
-from backend.websockets import notification_comment
+from backend.constants import COMMENT_UPDATED_REASON, \
+    COMMENT_CREATED_REASON, COMMENT_DELETED_REASON
 
 
 class Page(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('Page Owner'), related_name='pages')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             verbose_name=_('Page Owner'),
+                             related_name='pages')
     title = models.CharField(_('Page Title'), max_length=250)
 
     def __str__(self):
@@ -20,7 +22,9 @@ class Page(models.Model):
 
 
 class BlogArticle(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('Article Owner'), related_name='articles')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             verbose_name=_('Article Owner'),
+                             related_name='articles')
     title = models.CharField(_('Article Title'), max_length=250)
 
     def __str__(self):
@@ -31,23 +35,26 @@ class Comment(models.Model):
     class Meta:
         ordering = ('level', '-created')
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('Comment Owner'), related_name='comments')
-    created = models.DateTimeField(_('Comment created at'), editable=False, default=now)
-
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             verbose_name=_('Comment Owner'),
+                             related_name='comments')
+    created = models.DateTimeField(_('Comment created at'),
+                                   editable=False,
+                                   default=now)
     content_type = models.ForeignKey(ContentType,
                                      limit_choices_to=models.Q(app_label='backend', model='page') | models.Q(
-                                         app_label='backend', model='blogarticle'),
-                                     null=True,
-                                     blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+                                         app_label='backend', model='blogarticle'))
+    object_id = models.PositiveIntegerField()
     root = GenericForeignKey('content_type', 'object_id')
-    parent = models.ForeignKey('self', verbose_name=_('Comment Parent'), related_name='children', blank=True, null=True,
+    parent = models.ForeignKey('self', verbose_name=_('Comment Parent'),
+                               related_name='children', blank=True, null=True,
                                db_index=True)
     level = models.PositiveIntegerField(db_index=True, editable=False)
     ancestors = ArrayField(models.PositiveIntegerField(), db_index=True)
     text = models.TextField(_('Comment Text'))
     history = HistoricalRecords(
-        excluded_fields=['user', 'created', 'content_type', 'object_id', 'root', 'parent', 'level'])
+        excluded_fields=['user', 'created', 'content_type', 'object_id',
+                         'root', 'parent', 'level'])
 
     @property
     def _history_user(self):

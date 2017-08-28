@@ -30,18 +30,21 @@ class CommentHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment.history.model
-        fields = ('id', 'history_user_id', 'history_date', 'reason', 'text')
+        fields = ('id', 'history_user_id', 'history_date',
+                  'reason', 'text')
 
 
 class CommentSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True, required=False)
-    ancestors = serializers.ListField(child=serializers.IntegerField(), read_only=True)
+    ancestors = serializers.ListField(child=serializers.IntegerField(),
+                                      read_only=True)
 
     def validate(self, data):
         user_id = int(data.get('user_id', 0))
         if user_id:
             if not get_user_model().objects.filter(id=user_id).exist():
-                raise serializers.ValidationError('This field must be valid user id.')
+                raise serializers.ValidationError('This field must be'
+                                                  'valid user id.')
         return data
 
     class Meta:

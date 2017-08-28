@@ -3,17 +3,18 @@ from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import viewsets
-from rest_framework.decorators import list_route, detail_route
-from rest_framework.generics import ListAPIView
+from rest_framework.decorators import list_route
 from rest_framework.response import Response
 from rest_framework.status import HTTP_403_FORBIDDEN
 from rest_framework.viewsets import GenericViewSet
 
 from backend.permissions import IsOwnerOrReadOnly, IsLeafNodeOrNotDelete
 from backend.tasks import create_import_file, get_comments
+from comment.utils import get_sql
 from .filters import CommentFilter, CommentHistoryFilter
 from .models import BlogArticle, Page, Comment
-from .serializers import BlogArticleSerializer, PageSerializer, CommentSerializer, CommentHistorySerializer
+from .serializers import BlogArticleSerializer, PageSerializer, \
+    CommentSerializer, CommentHistorySerializer
 
 
 class BlogArticleViewSet(viewsets.ModelViewSet):
@@ -46,10 +47,14 @@ class CommentViewSet(viewsets.ModelViewSet):
     def download(self, request, **kwargs):
         query_params = request.query_params.copy()
         task_id = query_params.pop('task_id', [None])[0]
+        task = None
         if task_id is None:
-            task_id = create_import_file.delay(query_params, kwargs.get('format', 'xml')).id
-            return Response({'task_id': task_id})
-        task = AsyncResult(task_id)
+            queryset = self.filter_queryset(self.get_queryset())
+            query = get_sql(queryset)
+            task = create_import_file.delay(query, kwargs.get('format', 'xml'))
+            if not task.status == 'SUCCESS':
+                return Response({'task_id': task.id})
+        task = task or AsyncResult(task_id)
         status = task.status
         result = task.result
         response = {
@@ -60,7 +65,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             response['error'] = str(result)
         else:
             try:
-                file = open("/tmp/{0}".format(result['filename']))
+                file = open('/tmp/{0}'.format(result['filename']))
             except:
                 return Response(status=HTTP_403_FORBIDDEN)
             else:
@@ -79,11 +84,14 @@ class CommentViewSet(viewsets.ModelViewSet):
 
         query_params = request.query_params.copy()
         task_id = query_params.pop('task_id', [None])[0]
+        task = None
         if task_id is None:
             queryset = self.filter_queryset(self.get_queryset())
-            task_id = get_comments.delay(str(queryset.query)).id
-            return Response({'task_id': task_id})
-        task = AsyncResult(task_id)
+            query = get_sql(queryset)
+            task = get_comments.delay(query)
+            if not task.status == 'SUCCESS':
+                return Response({'task_id': task.id})
+        task = task or AsyncResult(task_id)
         status = task.status
         result = task.result
         response = {
